@@ -3,10 +3,12 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+// const encrypt = require("mongoose-encryption");
+const md5 = require("md5");
 
 const app = express();
 
+//console.log(md5("123456")); check if hashed password and password is the same
 
 app.use(express.static("public"));
 app.set("view engine", "ejs");
@@ -20,7 +22,7 @@ const userSchema = new mongoose.Schema ({
 });
 
 //const secret = "Thisisourlittlesecret";
-userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
+// userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
 
 //secret: secret - is the secret to use to encrypt the password
 
@@ -37,11 +39,11 @@ app.get("/login", function (req, res) {
 app.get("/register", function (req, res) {
     res.render("register")
 });
-
+//to make password in hash and it is inreversable
 app.post("/register", function (req, res) {
     const newUser = new User ({
         email: req.body.username,
-        password: req.body.password
+        password: md5(req.body.password)
     });
 
     newUser.save(function (err) {
