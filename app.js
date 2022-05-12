@@ -10,6 +10,8 @@ const mongoose = require("mongoose");
 const session = require ("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose"); 
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const findOrCreate = require("mongoose-findorcreate");
 
 const app = express();
 
@@ -36,12 +38,13 @@ mongoose.connect("mongodb://localhost:27017/userDB");
 
 const userSchema = new mongoose.Schema ({
     email: String,
-    password: String
+    password: String,
+    googleId: String
 });
 
 //set up passport local mongoose
 userSchema.plugin(passportLocalMongoose);
-
+userSchema.plugin(findOrCreate);
 //const secret = "Thisisourlittlesecret";
 // userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
 
@@ -51,12 +54,49 @@ const User = mongoose.model("User", userSchema);
 //identification of the password 386
 passport.use(User.createStrategy());
 //for sessions serialise gets message stores
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+// passport.serializeUser(User.serializeUser());
+// passport.deserializeUser(User.deserializeUser());
+passport.serializeUser(function (user, done) {
+    done(null, user.id);
+});
 
+passport.deserializeUser(function (id, done) {
+    User.findById(id, function (err, user) {
+        done(err, user);
+    });
+});
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets",
+    userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    console.log(profile);
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+//accessToken-allows us to get information about user
+//findorcreate is not a mongoose function it is a sudo function small version of find create and save functions and we can install npm of findorcreate
 app.get("/", function (req, res) {
     res.render("home")
 });
+//allows us to go to google page where we choose our email
+app.get("/auth/google",
+  passport.authenticate("google", { scope: ["profile"] })
+);
+//allows us after choosing email to go in a spcific page we want
+app.get("/auth/google/secrets", 
+  passport.authenticate("google", { failureRedirect: "/login"}),
+  function(req, res) {
+    // Successful authentication, redirect secrets.
+    res.redirect("/secrets");
+    }
+);
+
 
 app.get("/login", function (req, res) {
     res.render("login")
